@@ -7,7 +7,6 @@ import org.opencv.android.OpenCVLoader;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -17,13 +16,9 @@ import android.view.Window;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.RelativeLayout;
-import android.widget.SeekBar;
-import android.widget.TextView;
-import android.widget.ToggleButton;
-import android.widget.SeekBar.OnSeekBarChangeListener;
 
 public class FdActivity extends Activity {
-	private static final String TAG = "Sample::Activity";
+	private static final String TAG = "Activity";
 
 	private MenuItem mItemFace50;
 	private MenuItem mItemFace40;
@@ -32,33 +27,27 @@ public class FdActivity extends Activity {
 	private MenuItem mItemType;
 
 	private FdView mView;
-	public static int method = 1;
+	public static int method = 0;
 
 	private BaseLoaderCallback mOpenCVCallBack = new BaseLoaderCallback(this) {
+		@SuppressWarnings("deprecation")
 		@Override
 		public void onManagerConnected(int status) {
 			switch (status) {
 			case LoaderCallbackInterface.SUCCESS: {
 				Log.i(TAG, "OpenCV loaded successfully");
 
-				// Load native libs after OpenCV initialization
-				// System.loadLibrary("detection_based_tracker");
-
 				// Create and set View
 				mView = new FdView(mAppContext);
 				mView.setDetectorType(mDetectorType);
 				mView.setMinFaceSize(0.2f);
-
-				RelativeLayout.LayoutParams vsek = new RelativeLayout.LayoutParams(
-						RelativeLayout.LayoutParams.WRAP_CONTENT, 400);
-				vsek.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
 
 				Button btn = new Button(getApplicationContext());
 				btn.setText("eyeball");
 				RelativeLayout.LayoutParams btnp = new RelativeLayout.LayoutParams(
 						RelativeLayout.LayoutParams.WRAP_CONTENT,
 						RelativeLayout.LayoutParams.WRAP_CONTENT);
-				btnp.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
+				btnp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
 				btn.setId(2);
 
 				btn.setOnClickListener(new OnClickListener() {
@@ -67,10 +56,47 @@ public class FdActivity extends Activity {
 					}
 				});
 
+				final Button btn1 = new Button(getApplicationContext());
+				btn1.setText("SQDI");
+				RelativeLayout.LayoutParams btnp1 = new RelativeLayout.LayoutParams(
+						RelativeLayout.LayoutParams.WRAP_CONTENT,
+						RelativeLayout.LayoutParams.WRAP_CONTENT);
+				btnp1.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
+				btn1.setId(3);
+				btn1.setOnClickListener(new OnClickListener() {
+					public void onClick(View v) {
+						method = method + 1;
+						if (method > 5) {
+							method = 0;
+						}
+						switch (method) {
+						case 0:
+							btn1.setText("SQDI");
+							break;
+						case 1:
+							btn1.setText("SQDI_N");
+							break;
+						case 2:
+							btn1.setText("CCOE");
+							break;
+						case 3:
+							btn1.setText("CCOE_N");
+							break;
+						case 4:
+							btn1.setText("CCORR");
+							break;
+						case 5:
+							btn1.setText("CCORR_N");
+							break;
+						}
+					}
+				});
+
 				RelativeLayout frameLayout = new RelativeLayout(
 						getApplicationContext());
 				frameLayout.addView(mView, 0);
 				frameLayout.addView(btn, btnp);
+				frameLayout.addView(btn1, btnp1);
 				setContentView(frameLayout);
 
 				// Check native OpenCV camera
@@ -115,6 +141,7 @@ public class FdActivity extends Activity {
 			mView.releaseCamera();
 	}
 
+	@SuppressWarnings("deprecation")
 	@Override
 	protected void onResume() {
 		Log.i(TAG, "onResume");

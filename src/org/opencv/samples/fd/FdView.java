@@ -28,8 +28,13 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
+import java.text.DecimalFormat;
+
+import android.graphics.Color;
+import android.graphics.Paint;
+
 class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
-	private static final String TAG = "Sample::FdView";
+	private static final String TAG = "FdView";
 	private Mat mRgba;
 	private Mat mGray;
 	private Mat mZoomCorner;
@@ -45,25 +50,32 @@ class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 	private DetectionBasedTracker mNativeDetector;
 	private SurfaceHolder mHolder;
 	private VideoCapture mCamera;
-	private FpsMeter mFps;
+	int step;
+	int framesCouner;
+	double freq;
+	long prevFrameTime;
+	String strfps;
+	DecimalFormat twoPlaces = new DecimalFormat("0.00");
+	Paint paint;
 
-	private static final Scalar FACE_RECT_COLOR = new Scalar(0, 255, 0, 255);
+	private static final Scalar FACE_RECT_COLOR = new Scalar(255, 0, 0, 255);
 
 	public static final int JAVA_DETECTOR = 0;
 	public static final int NATIVE_DETECTOR = 1;
 
-	private static final int TM_SQDIFF = 0;
-	private static final int TM_SQDIFF_NORMED = 1;
-	private static final int TM_CCOEFF = 2;
-	private static final int TM_CCOEFF_NORMED = 3;
-	private static final int TM_CCORR = 4;
-	private static final int TM_CCORR_NORMED = 5;
+	private static final int SQDI = 0;
+	private static final int SQDI_N = 1;
+	private static final int CCOE = 2;
+	private static final int CCOE_N = 3;
+	private static final int CCORR = 4;
+	private static final int CCORR_N = 5;
 
 	private int mDetectorType = JAVA_DETECTOR;
 
 	private float mRelativeFaceSize = 0;
 	private int mAbsoluteFaceSize = 0;
 	private int learn_frames = 0;
+	@SuppressWarnings("unused")
 	private double match_value;
 	private Rect eyearea = new Rect();
 
@@ -94,7 +106,6 @@ class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 		super(context);
 		mHolder = getHolder();
 		mHolder.addCallback(this);
-		mFps = new FpsMeter();
 		Log.i(TAG, "Instantiated new " + this.getClass());
 		try {
 			InputStream is = context.getResources().openRawResource(
@@ -287,15 +298,15 @@ class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 			for (int i = 0; i < facesArray.length; i++) {
 				Rect r = facesArray[i];
 				Core.rectangle(mGray, r.tl(), r.br(),
-						new Scalar(0, 255, 0, 255), 3);
+						new Scalar(255, 0, 0, 255), 3);
 				Core.rectangle(mRgba, r.tl(), r.br(),
-						new Scalar(0, 255, 0, 255), 3);
+						new Scalar(255, 0, 0, 255), 3);
 
 				eyearea = new Rect(r.x + r.width / 8,
 						(int) (r.y + (r.height / 4.5)), r.width - 2 * r.width
 								/ 8, (int) (r.height / 3.0));
-				Core.rectangle(mRgba, eyearea.tl(), eyearea.br(), new Scalar(
-						255, 0, 0, 255), 2);
+				// Core.rectangle(mRgba, eyearea.tl(), eyearea.br(), new Scalar(
+				// 255, 0, 0, 255), 2);
 				Rect eyearea_right = new Rect(r.x + r.width / 16,
 						(int) (r.y + (r.height / 4.5)),
 						(r.width - 2 * r.width / 16) / 2,
@@ -337,9 +348,10 @@ class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 		}
 
 		Rect[] facesArray = faces.toArray();
-		for (int i = 0; i < facesArray.length; i++)
+		for (int i = 0; i < facesArray.length; i++) {
 			Core.rectangle(mRgba, facesArray[i].tl(), facesArray[i].br(),
 					FACE_RECT_COLOR, 3);
+		}
 
 		Bitmap bmp = Bitmap.createBitmap(mRgba.cols(), mRgba.rows(),
 				Bitmap.Config.ARGB_8888);
@@ -384,24 +396,24 @@ class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 		mResult = new Mat(result_cols, result_rows, CvType.CV_32FC1);
 
 		switch (type) {
-		case TM_SQDIFF:
+		case SQDI:
 			Imgproc.matchTemplate(mROI, mTemplate, mResult, Imgproc.TM_SQDIFF);
 			break;
-		case TM_SQDIFF_NORMED:
+		case SQDI_N:
 			Imgproc.matchTemplate(mROI, mTemplate, mResult,
 					Imgproc.TM_SQDIFF_NORMED);
 			break;
-		case TM_CCOEFF:
+		case CCOE:
 			Imgproc.matchTemplate(mROI, mTemplate, mResult, Imgproc.TM_CCOEFF);
 			break;
-		case TM_CCOEFF_NORMED:
+		case CCOE_N:
 			Imgproc.matchTemplate(mROI, mTemplate, mResult,
 					Imgproc.TM_CCOEFF_NORMED);
 			break;
-		case TM_CCORR:
+		case CCORR:
 			Imgproc.matchTemplate(mROI, mTemplate, mResult, Imgproc.TM_CCORR);
 			break;
-		case TM_CCORR_NORMED:
+		case CCORR_N:
 			Imgproc.matchTemplate(mROI, mTemplate, mResult,
 					Imgproc.TM_CCORR_NORMED);
 			break;
@@ -409,7 +421,7 @@ class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 
 		Core.MinMaxLocResult mmres = Core.minMaxLoc(mResult);
 
-		if (type == TM_SQDIFF || type == TM_SQDIFF_NORMED) {
+		if (type == SQDI || type == SQDI_N) {
 			matchLoc = mmres.minLoc;
 		} else {
 			matchLoc = mmres.maxLoc;
@@ -422,7 +434,7 @@ class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 		Core.rectangle(mRgba, matchLoc_tx, matchLoc_ty, new Scalar(255, 255, 0,
 				255));
 
-		if (type == TM_SQDIFF || type == TM_SQDIFF_NORMED) {
+		if (type == SQDI || type == SQDI_N) {
 			return mmres.maxVal;
 		} else {
 			return mmres.minVal;
@@ -430,6 +442,7 @@ class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 
 	}
 
+	@SuppressWarnings("unused")
 	private Mat get_template(CascadeClassifier clasificator, Rect area, int size) {
 		Mat template = new Mat();
 		Mat mROI = mGray.submat(area);
@@ -453,7 +466,7 @@ class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 			Mat vyrez = mRgba.submat(eye_only_rectangle);
 			Core.MinMaxLocResult mmG = Core.minMaxLoc(mROI);
 
-			Core.circle(vyrez, mmG.minLoc, 2, new Scalar(255, 255, 255, 255), 2);
+			Core.circle(vyrez, mmG.minLoc, 2, new Scalar(0, 255, 0, 255), 2);
 			iris.x = mmG.minLoc.x + eye_only_rectangle.x;
 			iris.y = mmG.minLoc.y + eye_only_rectangle.y;
 			eye_template = new Rect((int) iris.x - size / 2, (int) iris.y
@@ -469,7 +482,7 @@ class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 	@Override
 	public void run() {
 		Log.i(TAG, "Starting processing thread");
-		mFps.init();
+		this.init();
 
 		while (true) {
 			Bitmap bmp = null;
@@ -485,7 +498,7 @@ class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 
 				bmp = processFrame(mCamera);
 
-				mFps.measure();
+				this.measure();
 			}
 
 			if (bmp != null) {
@@ -505,7 +518,6 @@ class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 		Log.i(TAG, "Finishing processing thread");
 
 		synchronized (this) {
-			// Explicitly deallocate Mats
 			if (mRgba != null)
 				mRgba.release();
 			if (mGray != null)
@@ -519,5 +531,33 @@ class FdView extends SurfaceView implements SurfaceHolder.Callback, Runnable {
 			mGray = null;
 			mCascadeFile = null;
 		}
+	}
+
+	public void draw(Canvas canvas, float offsetx, float offsety) {
+		canvas.drawText(strfps, 20 + offsetx, 10 + 50 + offsety, paint);
+	}
+
+	public void measure() {
+		framesCouner++;
+		if (framesCouner % step == 0) {
+			long time = Core.getTickCount();
+			double fps = step * freq / (time - prevFrameTime);
+			prevFrameTime = time;
+			DecimalFormat twoPlaces = new DecimalFormat("0.00");
+			strfps = twoPlaces.format(fps) + " FPS";
+			Log.i(TAG, strfps);
+		}
+	}
+
+	public void init() {
+		step = 20;
+		framesCouner = 0;
+		freq = Core.getTickFrequency();
+		prevFrameTime = Core.getTickCount();
+		strfps = "";
+
+		paint = new Paint();
+		paint.setColor(Color.BLUE);
+		paint.setTextSize(50);
 	}
 }
